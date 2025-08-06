@@ -5,6 +5,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import google.generativeai as genai
 from dotenv import load_dotenv
+import markdown  # Add this import at the top
 
 
 # Configure the logger
@@ -28,8 +29,12 @@ genai.configure(api_key=GEMINI_API_KEY)
 # Gemini will be instructed to act as a financial analyst.
 research_prompts = [
     {
-        "topic": "Semiconductor Industry Analysis",
-        "prompt": "Analyze the semiconductor industry's outlook for the next 12-18 months. Focus on key growth drivers (e.g., AI chips, automotive), major players (e.g., NVDA, TSM, AMD), and potential supply chain or geopolitical risks. Identify 1-2 companies with the most compelling growth potential and provide a detailed investment thesis for each."
+        "topic": "Past week's White house announcement",
+        "prompt": "Leverage your experience as an investor to identify potential investment opportunities given the past week's US political announcements. Utilize your extensive knowledge and understanding of news reports, market trends to assess potential opportunities. The task involves conducting listing key announcements from the Whitehouse and the current administration, identifying key markets that will be impacted by the announcements, comprehensive industry research, and assessing potential risks and returns. You need to prepare a detailed report outlining the most promising opportunities, your rationale for selection, and potential risks and mitigation strategies."
+    },
+    {
+        "topic": "Identify trends and pick 5 stocks",
+        "prompt": "Leverage your 50 years of experience as an investor to identify potential investment opportunities in the stock market. Utilize your extensive knowledge and understanding of market trends, financial analysis, and risk management to assess potential opportunities. The task involves conducting comprehensive industry research, evaluating company financials, and assessing potential risks and returns. You need to prepare a detailed report outlining the most promising opportunities, your rationale for selection, and potential risks and mitigation strategies. Based on your report, recommend 5 stocks to invest in."
     },
 ]
 
@@ -51,7 +56,7 @@ def send_prompts_to_gemini(prompt_text):
 
         # The metaprompt instructs the model on how to behave.
         metaprompt = (
-            "You are an expert financial research analyst. Your task is to provide a detailed, evidence-based, and neutral analysis based on the following request. "
+            "Respond in markdown format and include all source links. "
             "Structure your response clearly. Where possible, outline your reasoning step-by-step. Avoid speculative language and focus on publicly known information and logical inferences.\n\n"
             f"Request: {prompt_text}"
         )
@@ -127,12 +132,19 @@ def main():
         
         # Get the analysis from Gemini
         response_text = send_prompts_to_gemini(prompt)
+
+        # Convert Markdown to HTML for better formatting
+        formatted_response = markdown.markdown(response_text)
         
         # Append to the HTML report
         full_report_html += f"<h2>{topic}</h2>"
         full_report_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
         # Using <pre> tag to preserve formatting from the model's response
-        full_report_html += f"<pre>{response_text}</pre>"
+        full_report_html += (
+            '<div style="background:#f5f5f5;padding:15px;border-radius:8px;'
+            'font-family:monospace;white-space:pre-wrap;word-break:break-word;">'
+            f"{formatted_response}</div>"
+        )
         full_report_html += "<hr>"
 
     # 2. Send the compiled report via email
