@@ -3,9 +3,11 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 import markdown  # Add this import at the top
+from prompts import research_prompts  # Import the research prompts from prompts.py
 
 
 # Configure the logger
@@ -21,25 +23,8 @@ SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_APP_PASSWORD = os.getenv("SENDER_APP_PASSWORD")
 RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
 
-# Configure the Gemini API
-genai.configure(api_key=GEMINI_API_KEY)
 
-# --- Prompts for Deep Research ---
-# These prompts are designed to ask for in-depth analysis.
-# Gemini will be instructed to act as a financial analyst.
-research_prompts = [
-    {
-        "topic": "Past week's White house announcement",
-        "prompt": "Leverage your experience as an investor to identify potential investment opportunities given the past week's US political announcements. Utilize your extensive knowledge and understanding of news reports, market trends to assess potential opportunities. The task involves conducting listing key announcements from the Whitehouse and the current administration, identifying key markets that will be impacted by the announcements, comprehensive industry research, and assessing potential risks and returns. You need to prepare a detailed report outlining the most promising opportunities, your rationale for selection, and potential risks and mitigation strategies."
-    },
-    {
-        "topic": "Identify trends and pick 5 stocks",
-        "prompt": "Leverage your 50 years of experience as an investor to identify potential investment opportunities in the stock market. Utilize your extensive knowledge and understanding of market trends, financial analysis, and risk management to assess potential opportunities. The task involves conducting comprehensive industry research, evaluating company financials, and assessing potential risks and returns. You need to prepare a detailed report outlining the most promising opportunities, your rationale for selection, and potential risks and mitigation strategies. Based on your report, recommend 5 stocks to invest in."
-    },
-]
-
-
-def send_prompts_to_gemini(prompt_text):
+def send_prompts_to_gemini(client, model_to_use, config, prompt_text):
     """
     Sends a single prompt to the Gemini API using a model configured for deep research.
 
@@ -51,17 +36,17 @@ def send_prompts_to_gemini(prompt_text):
     """
     logging.info(f"Sending prompt for: {prompt_text[:50]}...")
     try:
-        # Using a powerful model suitable for research and complex reasoning.
-        model = genai.GenerativeModel('gemini-1.5-pro-latest')
-
         # The metaprompt instructs the model on how to behave.
         metaprompt = (
-            "Respond in markdown format and include all source links. "
+            "Respond in markdown format and include source links and dates. "
             "Structure your response clearly. Where possible, outline your reasoning step-by-step. Avoid speculative language and focus on publicly known information and logical inferences.\n\n"
             f"Request: {prompt_text}"
         )
         
-        response = model.generate_content(metaprompt)
+        response = client.models.generate_content(
+            model = model_to_use,
+            contents = metaprompt,
+            config=config)
         logging.info("...Response received.")
         return response.text
     except Exception as e:
@@ -123,15 +108,23 @@ def main():
     Main function to run the research agent.
     """
     logging.info("Starting the morning stock market research agent...")
-    full_report_html = "<h1>Morning Stock Market Research Briefing</h1>"
     
+    # Set up the Gemini model, with Google Search tool enabled.
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    grounding_tool = types.Tool(google_search =types.GoogleSearch())
+    config = types.GenerateContentConfig(
+        tools=[grounding_tool]
+    )
+    model_to_use = 'gemini-2.5-pro'  # Latest pro model as of Aug 2025.
+
     # 1. Gather research from Gemini for each prompt
+    full_report_html = "<h1>Morning Stock Market Research</h1>"
     for item in research_prompts:
         topic = item["topic"]
         prompt = item["prompt"]
         
         # Get the analysis from Gemini
-        response_text = send_prompts_to_gemini(prompt)
+        response_text = send_prompts_to_gemini(client, model_to_use, config, prompt)
 
         # Convert Markdown to HTML for better formatting
         formatted_response = markdown.markdown(response_text)

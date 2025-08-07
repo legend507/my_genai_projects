@@ -1,0 +1,2 @@
+2025-08-06 It seems `import google.generativeai as genai` can't use live Google search results to respond my prompt. This is a blocker.
+[google.generativeai package deprecated]https://github.com/google-gemini/deprecated-generative-ai-python/tree/main?tab=readme-ov-file, I need to use [google.genai] instead.

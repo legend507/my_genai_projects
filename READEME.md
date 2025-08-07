@@ -1,1 +1,0 @@
-2025-08-06 It seems `import google.generativeai as genai` can't use live Google search results to respond my prompt. This is a blocker.
