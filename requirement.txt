@@ -1,3 +1,6 @@
 google-genai
 python-dotenv
 markdown
+functions-framework
+cloudevents
+openai

@@ -9,9 +9,13 @@ from dotenv import load_dotenv
 import markdown  # Add this import at the top
 from prompts import research_prompts  # Import the research prompts from prompts.py
 
+# For GCP Cloud Run Functions.
+from cloudevents.http import CloudEvent
+import functions_framework
+
 
 # Configure the logger
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(filename)s:%(lineno)d - %(message)s')
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -102,12 +106,12 @@ def send_email(subject, body):
     except Exception as e:
         logging.error(f"Failed to send email: {e}")
 
-
-def main():
+@functions_framework.cloud_event
+def run_morning_stock_research(cloud_event: CloudEvent):
     """
     Main function to run the research agent.
     """
-    logging.info("Starting the morning stock market research agent...")
+    logging.info(f"Starting the morning stock market research agent...")
     
     # Set up the Gemini model, with Google Search tool enabled.
     client = genai.Client(api_key=GEMINI_API_KEY)
@@ -148,4 +152,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run_morning_stock_research(None)
