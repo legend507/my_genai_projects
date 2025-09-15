@@ -90,9 +90,9 @@ if __name__ == "__main__":
 	watcher = TrendWatcher()
 
 	print("Trending Tweets about 'AI':")
-	tweets = watcher.get_trendy_tweets("AI")
+	tweets = watcher.get_trendy_tweets("investment lang:en -is:retweet") # topic, English, no retweets.
 	print(tweets)
 
-	# print("\nTrending Reddit posts from r/wallstreetbets:")
-	# posts = watcher.get_trendy_reddit_posts(subreddit="wallstreetbets", count=20)
-	# print(posts)
+	print("\nTrending Reddit posts from r/wallstreetbets:")
+	posts = watcher.get_trendy_reddit_posts(subreddit="wallstreetbets", count=20)
+	print(posts)

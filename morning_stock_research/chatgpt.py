@@ -4,9 +4,6 @@ import os
 from openai import OpenAI
 from dotenv import load_dotenv
 
-from prompts import research_prompts  # Import the research prompts from prompts.py
-
-
 # Configure the logger
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(filename)s:%(lineno)d - %(message)s')
 # Load environment variables from a .env file

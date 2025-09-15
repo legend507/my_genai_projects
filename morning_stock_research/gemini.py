@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 import markdown  # Add this import at the top
-from prompts import research_prompts  # Import the research prompts from prompts.py
+from morning_stock_research.prompts import research_prompts  # Import the research prompts from prompts.py
 
 # For GCP Cloud Run Functions.
 from cloudevents.http import CloudEvent
