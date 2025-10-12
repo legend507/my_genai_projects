@@ -6,7 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
-import markdown  # Add this import at the top
+import markdown
 from morning_stock_research.prompts import research_prompts  # Import the research prompts from prompts.py
 
 # For GCP Cloud Run Functions.

@@ -2,6 +2,7 @@
 import os
 import gspread
 from google.oauth2.service_account import Credentials
+import pandas as pd
 
 class GoogleSheetReader:
     def __init__(self, creds_json_path: str, sheet_name: str):
@@ -56,6 +57,31 @@ class GoogleSheetReader:
         for cell in cells:
             data.append(worksheet.acell(cell).value)
         return data
+    
+    def read_my_portfolio(self, worksheet_name: str = "Trade Records"):
+        """Read my holdings to decide when to close positions.
+        """
+        # worksheet_data in array format.
+        worksheet_data = self.read_worksheet(worksheet_name)
+
+        if not worksheet_data or len(worksheet_data) < 2:
+            return pd.DataFrame()  # Return empty DataFrame if no data.
+        df = pd.DataFrame(worksheet_data[1:], columns=worksheet_data[0])
+        return df
+    
+    def read_my_current_holdings(self):
+        """From my portfolio, filter current holdings.
+        """
+        my_portfolio = self.read_my_portfolio()
+        # Filter condition: US stock, no out date.
+        return my_portfolio[
+            (my_portfolio["Broker"] == "IBKR") & (my_portfolio["Out date"] == "")
+        ]
+    
+    def read_my_watchlist(self, worksheet_name: str = "Stock Eval"):
+        """Read my watchlist to decide when to open positions.
+        """
+        return self.read_worksheet(worksheet_name)
 
 
 if __name__ == "__main__":
@@ -68,21 +94,7 @@ if __name__ == "__main__":
         os.path.dirname(__file__), 
         "../wordpress-hosting-302807-2a5d57c336dd.json"))
     reader = GoogleSheetReader(creds_path, sheet_be_richer)
-    
-    # Read entire worksheet
-    all_data = reader.read_worksheet(tab_trade_records)
-    print("All Data:", all_data)
-    
-    # Read specific columns
-    columns_data = reader.read_columns(tab_trade_records, ['A', 'C'])
-    print("Columns Data:", columns_data)
-    
-    # Read specific rows
-    rows_data = reader.read_rows(tab_trade_records, [1, 3])
-    print("Rows Data:", rows_data)
-    
-    # Read specific cells
-    cells_data = reader.read_cells(tab_trade_records, ['A1', 'B2'])
-    print("Cells Data:", cells_data)
 
-
+    # Read my current holdings.
+    my_current_holdings = reader.read_my_current_holdings()
+    print("Portfolio:", my_current_holdings)
