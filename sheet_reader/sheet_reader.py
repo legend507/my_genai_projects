@@ -69,14 +69,14 @@ class GoogleSheetReader:
         df = pd.DataFrame(worksheet_data[1:], columns=worksheet_data[0])
         return df
     
-    def read_my_current_holdings(self):
+    def read_my_current_holdings(self) -> pd.Series:
         """From my portfolio, filter current holdings.
         """
         my_portfolio = self.read_my_portfolio()
         # Filter condition: US stock, no out date.
         return my_portfolio[
             (my_portfolio["Broker"] == "IBKR") & (my_portfolio["Out date"] == "")
-        ]
+        ]["Ticker"]
     
     def read_my_watchlist(self, worksheet_name: str = "Stock Eval"):
         """Read my watchlist to decide when to open positions.

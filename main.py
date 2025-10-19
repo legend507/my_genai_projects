@@ -1,6 +1,7 @@
 from trend_watcher.trend_watcher import TrendWatcher
 from morning_stock_research.chatgpt import ask_chatgpt_with_search
 from morning_stock_research.gemini import send_prompts_to_gemini, send_email
+from sheet_reader.sheet_reader import GoogleSheetReader
 import logging
 from google import genai
 from google.genai import types
@@ -12,7 +13,10 @@ from dotenv import load_dotenv
 from cloudevents.http import CloudEvent
 import functions_framework
 
-from morning_stock_research.prompts import research_prompts  # Import the research prompts from prompts.py
+# Import predefined prompts.
+from morning_stock_research.prompts import research_prompts
+from trend_watcher.prompts import trend_watcher_prompts
+from sheet_reader.prompts import sheet_reader_prompts
 
 
 load_dotenv()
@@ -20,6 +24,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(file
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 EMAIL_SUBJECT = "Your Daily Market Research Briefing + Reddit Trends"
+GEMINI_MODEL_ID = "gemini-2.5-pro"  # Latest pro model as of Aug 2025.
 
 
 def run_morning_stock_research() -> str:
@@ -27,14 +32,6 @@ def run_morning_stock_research() -> str:
     """
     logging.info(f"Starting the morning stock market research agent...")
     
-    # Set up the Gemini model, with Google Search tool enabled.
-    client = genai.Client(api_key=GEMINI_API_KEY)
-    grounding_tool = types.Tool(google_search =types.GoogleSearch())
-    config = types.GenerateContentConfig(
-        tools=[grounding_tool]
-    )
-    model_to_use = 'gemini-2.5-pro'  # Latest pro model as of Aug 2025.
-
     # 1. Gather research from Gemini for each prompt
     report_html = "<h1>Morning Stock Market Research</h1>"
     for item in research_prompts:
@@ -42,7 +39,7 @@ def run_morning_stock_research() -> str:
         prompt = item["prompt"]
         
         # Get the analysis from Gemini
-        response_text = send_prompts_to_gemini(client, model_to_use, config, prompt)
+        response_text = send_prompts_to_gemini(None, None, None, prompt)
 
         # Convert Markdown to HTML for better formatting
         formatted_response = markdown.markdown(response_text)
@@ -72,23 +69,12 @@ def run_trend_watcher() -> str:
     
     # Format the posts into a single prompt.
     formatted_posts = "\n".join(
-        [f"{i+1}. {post['title']} (Scores: {post['score']}) (URL: {post['url']}) (comments: {post['comments']})" for i, post in enumerate(top_reddit_posts)]
+        [f"{i+1}. {post['title']} (Scores: {post['score']}) (URL: {post['url']}) \n\n" for i, post in enumerate(top_reddit_posts)]
     )
-    prompt = (
-        "Summarize the following Reddit posts from r/wallstreetbets, "
-        "and tell me what investment insights or advice can you provide?\n\n"
-        f"{formatted_posts}"
-    )
+    prompt = (trend_watcher_prompts["reddit"] + f"{formatted_posts}")
     logging.info(f"Sdnding prompt to Gemini: {prompt[:100]}...")
 
-    # Send those posts to Gemini.
-    model_to_use = 'gemini-2.5-pro'  # Latest pro model as of Aug 2025.
-    client = genai.Client(api_key=GEMINI_API_KEY)
-    grounding_tool = types.Tool(google_search =types.GoogleSearch())
-    config = types.GenerateContentConfig(
-        tools=[grounding_tool]
-    )
-    gemini_response = send_prompts_to_gemini(client, model_to_use, config, prompt_text=prompt)
+    gemini_response = send_prompts_to_gemini(None, None, None, prompt_text=prompt)
     formatted_response = markdown.markdown(gemini_response)
     report_html = "<h1>TrendWatcher Analysis</h1>"
     report_html += f"<h2>Reddit Top 50 Trending Posts</h2>"
@@ -102,13 +88,44 @@ def run_trend_watcher() -> str:
     logging.info("run_trend_watcher agent has finished its work.")
     return report_html
 
+def run_sheet_reader() -> str: 
+    """Reads my portfolio data from Google sheet and process.
+    """
+    logging.info("Starting Google Sheets reader...")
+    # Get my holdings from sheet.
+    sheet_be_richer = 'be_richer'
+    creds_path = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), 
+        "./wordpress-hosting-302807-2a5d57c336dd.json"))
+    reader = GoogleSheetReader(creds_path, sheet_be_richer)
+    my_holdings = reader.read_my_current_holdings()
+    
+    # Prepare prompts.
+    prompt = sheet_reader_prompts["my_holdings"] + f"\nHere is my current holdings data:\n{my_holdings.to_string(index=False)}"
+    logging.info(f"Sending prompt to Gemini: {prompt[:100]}...")
+    gemini_response = send_prompts_to_gemini(None, None, None, prompt_text=prompt)
+    formatted_response = markdown.markdown(gemini_response)
+
+    report_html = "<h1>My Holdings Analysis</h1>"
+    report_html += f"<h2>Holdings Analysis</h2>"
+    report_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
+    report_html += (
+            '<div style="background:#f5f5f5;padding:15px;border-radius:8px;'
+            'font-family:monospace;white-space:pre-wrap;word-break:break-word;">'
+            f"{formatted_response}</div>"
+        )
+    report_html += "<hr>"
+    logging.info("Google Sheets reader has finished its work.")
+    return report_html
+
 @functions_framework.cloud_event
 def main(cloud_event: CloudEvent):
     stock_report_html = run_morning_stock_research()
     trend_watcher_report = run_trend_watcher()
+    sheet_reader_report = run_sheet_reader()
 
     # Concatenate all reports and send via email.
-    full_report_html = stock_report_html + trend_watcher_report
+    full_report_html = stock_report_html + trend_watcher_report + sheet_reader_report
     send_email(EMAIL_SUBJECT, full_report_html)
 
     logging.info("Main function execution completed.")

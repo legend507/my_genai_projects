@@ -39,6 +39,15 @@ def send_prompts_to_gemini(client, model_to_use, config, prompt_text):
         str: The text response from Gemini.
     """
     logging.info(f"Sending prompt for: {prompt_text[:50]}...")
+    if not client:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+    if not model_to_use:
+        model_to_use = "gemini-2.5-pro"
+    if not config:
+        grounding_tool = types.Tool(google_search =types.GoogleSearch())
+        config = types.GenerateContentConfig(
+            tools=[grounding_tool]
+        )
     try:
         # The metaprompt instructs the model on how to behave.
         metaprompt = (
