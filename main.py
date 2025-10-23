@@ -17,7 +17,7 @@ import functions_framework
 from morning_stock_research.prompts import research_prompts
 from trend_watcher.prompts import trend_watcher_prompts
 from sheet_reader.prompts import sheet_reader_prompts
-
+from web_dashboards.prompts import url_resources
 
 load_dotenv()
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(filename)s:%(lineno)d - %(message)s')
@@ -42,7 +42,7 @@ def run_morning_stock_research() -> str:
         response_text = send_prompts_to_gemini(None, None, None, prompt)
 
         # Convert Markdown to HTML for better formatting
-        formatted_response = markdown.markdown(response_text)
+        formatted_response = markdown.markdown(response_text, extensions=["tables"])
         
         # Append to the HTML report
         report_html += f"<h2>{topic}</h2>"
@@ -75,7 +75,7 @@ def run_trend_watcher() -> str:
     logging.info(f"Sdnding prompt to Gemini: {prompt[:100]}...")
 
     gemini_response = send_prompts_to_gemini(None, None, None, prompt_text=prompt)
-    formatted_response = markdown.markdown(gemini_response)
+    formatted_response = markdown.markdown(gemini_response, extensions=["tables"])
     report_html = "<h1>TrendWatcher Analysis</h1>"
     report_html += f"<h2>Reddit Top 50 Trending Posts</h2>"
     report_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
@@ -99,15 +99,15 @@ def run_sheet_reader() -> str:
         "./wordpress-hosting-302807-2a5d57c336dd.json"))
     reader = GoogleSheetReader(creds_path, sheet_be_richer)
     my_holdings = reader.read_my_current_holdings()
-    
-    # Prepare prompts.
-    prompt = sheet_reader_prompts["my_holdings"] + f"\nHere is my current holdings data:\n{my_holdings.to_string(index=False)}"
+
+    # Title.
+    report_html = "<h1>My Holdings Analysis</h1>"
+    # Report 1, negative impact analysis.
+    prompt = sheet_reader_prompts["my_holdings_negative_impact"] + f"\nHere is my current holdings data:\n{my_holdings.to_string(index=False)}"
     logging.info(f"Sending prompt to Gemini: {prompt[:100]}...")
     gemini_response = send_prompts_to_gemini(None, None, None, prompt_text=prompt)
-    formatted_response = markdown.markdown(gemini_response)
-
-    report_html = "<h1>My Holdings Analysis</h1>"
-    report_html += f"<h2>Holdings Analysis</h2>"
+    formatted_response = markdown.markdown(gemini_response, extensions=["tables"])
+    report_html += f"<h2>Negative Impact Analysis</h2>"
     report_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
     report_html += (
             '<div style="background:#f5f5f5;padding:15px;border-radius:8px;'
@@ -115,7 +115,41 @@ def run_sheet_reader() -> str:
             f"{formatted_response}</div>"
         )
     report_html += "<hr>"
+    # Report 2, down trend for the past 3 days.
+    prompt = sheet_reader_prompts["my_holdings_down_trend_3days"] + f"\nHere is my current holdings data:\n{my_holdings.to_string(index=False)}"
+    logging.info(f"Sending prompt to Gemini: {prompt[:100]}...")
+    gemini_response = send_prompts_to_gemini(None, None, None, prompt_text=prompt)
+    formatted_response = markdown.markdown(gemini_response, extensions=["tables"])
+    report_html += f"<h2>Down Trend 3 Days Analysis</h2>"
+    report_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
+    report_html += (
+            '<div style="background:#f5f5f5;padding:15px;border-radius:8px;'
+            'font-family:monospace;white-space:pre-wrap;word-break:break-word;">'
+            f"{formatted_response}</div>"
+        )
+    report_html += "<hr>"
+
     logging.info("Google Sheets reader has finished its work.")
+    return report_html
+
+def run_politician_trades() -> str:
+    """Fetches recent stock trades made by US Congress members and analyzes them.
+    """
+    logging.info("Starting Politician Trades Analysis...")
+    # Example URL for politician trades.
+    prompt = url_resources["prompts"] + ",".join(url_resources["well_known_politicians"])
+    logging.info(f"Sending prompt to Gemini: {prompt[:100]}...")
+    gemini_response = send_prompts_to_gemini(None, None, None, prompt_text=prompt, url_grounding=True)
+    formatted_response = markdown.markdown(gemini_response, extensions=["tables"])
+    report_html = "<h1>Politician Trades Analysis</h1>"
+    report_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
+    report_html += (
+            '<div style="background:#f5f5f5;padding:15px;border-radius:8px;'
+            'font-family:monospace;white-space:pre-wrap;word-break:break-word;">'
+            f"{formatted_response}</div>"
+        )
+    report_html += "<hr>"
+    logging.info("Politician Trades Analysis has finished its work.")
     return report_html
 
 @functions_framework.cloud_event
@@ -123,9 +157,13 @@ def main(cloud_event: CloudEvent):
     stock_report_html = run_morning_stock_research()
     trend_watcher_report = run_trend_watcher()
     sheet_reader_report = run_sheet_reader()
+    politician_trades_report = run_politician_trades()
 
     # Concatenate all reports and send via email.
-    full_report_html = stock_report_html + trend_watcher_report + sheet_reader_report
+    full_report_html = (stock_report_html 
+                        + trend_watcher_report 
+                        + sheet_reader_report
+                        + politician_trades_report)
     send_email(EMAIL_SUBJECT, full_report_html)
 
     logging.info("Main function execution completed.")

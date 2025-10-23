@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 import markdown
-from morning_stock_research.prompts import research_prompts  # Import the research prompts from prompts.py
+from .prompts import research_prompts  # Import the research prompts from prompts.py
 
 # For GCP Cloud Run Functions.
 from cloudevents.http import CloudEvent
@@ -28,7 +28,7 @@ SENDER_APP_PASSWORD = os.getenv("SENDER_APP_PASSWORD")
 RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
 
 
-def send_prompts_to_gemini(client, model_to_use, config, prompt_text):
+def send_prompts_to_gemini(client, model_to_use, config, prompt_text, url_grounding = False) -> str:
     """
     Sends a single prompt to the Gemini API using a model configured for deep research.
 
@@ -44,7 +44,11 @@ def send_prompts_to_gemini(client, model_to_use, config, prompt_text):
     if not model_to_use:
         model_to_use = "gemini-2.5-pro"
     if not config:
-        grounding_tool = types.Tool(google_search =types.GoogleSearch())
+        # If url is in prompts, use grounding_tool, else use google search tool.
+        if url_grounding:
+            grounding_tool = {"url_context": {}}
+        else:
+            grounding_tool = types.Tool(google_search =types.GoogleSearch())
         config = types.GenerateContentConfig(
             tools=[grounding_tool]
         )
@@ -161,4 +165,7 @@ def run_morning_stock_research(cloud_event: CloudEvent):
 
 
 if __name__ == "__main__":
-    run_morning_stock_research(None)
+    # Test.
+    url = "https://www.insiderfinance.io/congress-trades"
+    response = send_prompts_to_gemini(None, None, None, f"From this url {url} find all trades Michael T. McCaul executed.", url_grounding=True)
+    print(response)
