@@ -7,7 +7,7 @@ url_resources = {
     # Multiple sources available, but they somewhat give different data.
     # "Quiver Quants Congress Trading Dashboard": "https://www.quiverquant.com/congresstrading/",
 
-    "prompts":"Based on the urls provided, tell me which US Congress member traded which = stocks and when. Here are the urls: ",
+    "prompts":"Based on the urls provided, tell me which US Congress member traded which stocks and when. Summarize the results in 2 tables organized bought and sould. Here are the urls: ",
     "well_known_politicians": [
         # Ron Wyden
         "https://www.quiverquant.com/congresstrading/politician/Ron%20Wyden-W000779",

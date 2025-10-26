@@ -137,7 +137,7 @@ def run_politician_trades() -> str:
     """
     logging.info("Starting Politician Trades Analysis...")
     # Example URL for politician trades.
-    prompt = url_resources["prompts"] + ",".join(url_resources["well_known_politicians"])
+    prompt = url_resources["prompts"] + ", ".join(url_resources["well_known_politicians"])
     logging.info(f"Sending prompt to Gemini: {prompt[:100]}...")
     gemini_response = send_prompts_to_gemini(None, None, None, prompt_text=prompt, url_grounding=True)
     formatted_response = markdown.markdown(gemini_response, extensions=["tables"])
