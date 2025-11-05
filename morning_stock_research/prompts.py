@@ -7,4 +7,9 @@ research_prompts = [
         "topic": "Identify trends and pick 5 stocks",
         "prompt": "Leverage your 50 years of experience as an investor to identify potential investment opportunities in the stock market. Utilize your extensive knowledge and understanding of market trends, financial analysis, and risk management to assess potential opportunities. The task involves conducting comprehensive industry research, evaluating company financials, and assessing potential risks and returns. You need to prepare a detailed report outlining the most promising opportunities, your rationale for selection, and potential risks and mitigation strategies. Based on your report, recommend 5 stocks to invest in."
     },
+    {
+        "topic": "Big dips for the past 3 trading days",
+        # Can't just say the US stock market, otherwise LLM gives bunch of very small cap stocks.
+        "prompt": "Show me the top 10 losers in the S&P 500 and Nasdaq 100 in the most recent trading day."
+    },
 ]

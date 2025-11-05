@@ -157,13 +157,16 @@ def main(cloud_event: CloudEvent):
     stock_report_html = run_morning_stock_research()
     trend_watcher_report = run_trend_watcher()
     sheet_reader_report = run_sheet_reader()
-    politician_trades_report = run_politician_trades()
+
+    # Don't think it's very useful.
+    # politician_trades_report = run_politician_trades()
 
     # Concatenate all reports and send via email.
     full_report_html = (stock_report_html 
                         + trend_watcher_report 
                         + sheet_reader_report
-                        + politician_trades_report)
+                        # + politician_trades_report
+                        )
     send_email(EMAIL_SUBJECT, full_report_html)
 
     logging.info("Main function execution completed.")
