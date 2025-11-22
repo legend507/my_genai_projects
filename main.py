@@ -24,7 +24,6 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(file
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 EMAIL_SUBJECT = "Your Daily Market Research Briefing + Reddit Trends"
-GEMINI_MODEL_ID = "gemini-2.5-pro"  # Latest pro model as of Aug 2025.
 
 
 def run_morning_stock_research() -> str:

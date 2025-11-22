@@ -12,4 +12,8 @@ research_prompts = [
         # Can't just say the US stock market, otherwise LLM gives bunch of very small cap stocks.
         "prompt": "Show me the top 10 losers in the S&P 500 and Nasdaq 100 in the most recent trading day."
     },
+    {
+        "topic": "Big surges for the past 3 trading days",
+        "prompt": "Show me the top 10 gainers in the S&P 500 and Nasdaq 100 in the most recent trading day."
+    },
 ]

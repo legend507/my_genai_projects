@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -7,8 +8,12 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 import markdown
-from .prompts import research_prompts  # Import the research prompts from prompts.py
 
+# Try relative import first (when used as a package), fall back to direct import for testing
+try:
+    from .prompts import research_prompts  # Import the research prompts from prompts.py
+except ImportError:
+    from prompts import research_prompts  # For direct script execution
 # For GCP Cloud Run Functions.
 from cloudevents.http import CloudEvent
 import functions_framework
@@ -42,7 +47,7 @@ def send_prompts_to_gemini(client, model_to_use, config, prompt_text, url_ground
     if not client:
         client = genai.Client(api_key=GEMINI_API_KEY)
     if not model_to_use:
-        model_to_use = "gemini-2.5-pro"
+        model_to_use = "gemini-3-pro-preview"  # Latest pro preview model as of Nov 2025.
     if not config:
         # If url is in prompts, use grounding_tool, else use google search tool.
         if url_grounding:
@@ -69,7 +74,6 @@ def send_prompts_to_gemini(client, model_to_use, config, prompt_text, url_ground
     except Exception as e:
         logging.error(f"An error occurred while calling the Gemini API: {e}")
         return f"Error generating response for prompt: {prompt_text}"
-
 
 def send_email(subject, body):
     """
@@ -119,6 +123,34 @@ def send_email(subject, body):
     except Exception as e:
         logging.error(f"Failed to send email: {e}")
 
+def send_prompts_to_gemini_veo(client, prompt_text, mp4_file_path="/home/tobi/Videos/") -> None:
+    """Video generation.
+    """
+    logging.info(f"Sending prompt for: {prompt_text[:50]}...")
+    if not client:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+    operation = client.models.generate_videos(
+        model="veo-3.1-generate-preview",
+        prompt=prompt_text,)
+    
+    # Poll the operation status until the video is ready.
+    while not operation.done:
+        logging.info("Video generation in progress, waiting for 10 seconds...")
+        time.sleep(10)
+        operation = client.operations.get(operation)
+
+    # Download the generated video.
+    generated_video = operation.response.generated_videos[0]
+    client.files.download(file=generated_video.video)
+    mp4_file_path = os.path.join(mp4_file_path, f"{prompt_text}.mp4")
+    generated_video.video.save(mp4_file_path)
+    logging.info(f"Video saved as {mp4_file_path}.")
+
+def send_prompts_to_gemini_lyria():
+    """Music generation.
+    """
+    return
+
 @functions_framework.cloud_event
 def run_morning_stock_research(cloud_event: CloudEvent):
     """
@@ -165,7 +197,10 @@ def run_morning_stock_research(cloud_event: CloudEvent):
 
 
 if __name__ == "__main__":
-    # Test.
-    url = "https://www.insiderfinance.io/congress-trades"
-    response = send_prompts_to_gemini(None, None, None, f"From this url {url} find all trades Michael T. McCaul executed.", url_grounding=True)
-    print(response)
+    # Test video generation with Gemini Veo
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    prompt_text = "A commercial ad where pretty girls showers with diet coke, 4K resolution"
+    
+    logging.info("Testing send_prompts_to_gemini_veo function...")
+    send_prompts_to_gemini_veo(client, prompt_text)
+    logging.info("Video generation test completed.")

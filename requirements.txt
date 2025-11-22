@@ -8,3 +8,6 @@ functions-framework
 cloudevents
 gspread
 pandas
+pytrends
+google-api-python-client
+TikTokApi
