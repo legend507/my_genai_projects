@@ -1,8 +1,14 @@
-import logging
 import os
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+import logging
+import time
+
+# Config models.
+IMAGE_MODEL = 'gemini-3-pro-image-preview'
+AUDIO_MODEL = ''
+VIDEO_MODEL = 'veo-3.1-generate-preview'
 
 # Configure the logger
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(filename)s:%(lineno)d - %(message)s')
@@ -34,23 +40,17 @@ class GeminiContentGenerator():
         try:
             self.logger.info(f"Generating image with prompt: {prompt}")
             
-            response = self.client.models.generate_images(
-                model="imagen-3.0-generate-001",
-                prompt=prompt,
-                number_of_images=1,
-                safety_filter_level="block_none",
+            response = self.client.models.generate_content(
+                model=IMAGE_MODEL,
+                contents=[prompt],
             )
             
-            image_url = response.generated_images[0].gcs_uri
-            self.logger.info(f"Image generated successfully: {image_url}")
-            
-            if output_path:
-                # Save image URL to file or download
-                with open(output_path, 'w') as f:
-                    f.write(f"Generated Image URL:\n{image_url}\n")
-                self.logger.info(f"Image reference saved to {output_path}")
-            
-            return image_url
+            for part in response.parts:
+                if part.text is not None:
+                    self.logger.info(part.text)
+                elif part.inline_data is not None:
+                    image = part.as_image()
+                    image.save("generated_image.png")
             
         except Exception as e:
             self.logger.error(f"Error generating image: {str(e)}")
@@ -71,7 +71,7 @@ class GeminiContentGenerator():
             self.logger.info(f"Generating audio with prompt: {prompt}")
             
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model=AUDIO_MODEL,
                 contents=f"Generate a script or narration for the following request: {prompt}"
             )
             
@@ -105,7 +105,7 @@ class GeminiContentGenerator():
             self.logger.info(f"Generating video with prompt: {prompt}")
             
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model=VIDEO_MODEL,
                 contents=f"Generate a detailed video script and storyboard for the following request: {prompt}"
             )
             
@@ -123,4 +123,4 @@ class GeminiContentGenerator():
         except Exception as e:
             self.logger.error(f"Error generating video: {str(e)}")
             raise
-
+        
