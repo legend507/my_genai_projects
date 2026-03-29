@@ -123,34 +123,6 @@ def send_email(subject, body):
     except Exception as e:
         logging.error(f"Failed to send email: {e}")
 
-def send_prompts_to_gemini_veo(client, prompt_text, mp4_file_path="/home/tobi/Videos/") -> None:
-    """Video generation.
-    """
-    logging.info(f"Sending prompt for: {prompt_text[:50]}...")
-    if not client:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-    operation = client.models.generate_videos(
-        model="veo-3.1-generate-preview",
-        prompt=prompt_text,)
-    
-    # Poll the operation status until the video is ready.
-    while not operation.done:
-        logging.info("Video generation in progress, waiting for 10 seconds...")
-        time.sleep(10)
-        operation = client.operations.get(operation)
-
-    # Download the generated video.
-    generated_video = operation.response.generated_videos[0]
-    client.files.download(file=generated_video.video)
-    mp4_file_path = os.path.join(mp4_file_path, f"{prompt_text}.mp4")
-    generated_video.video.save(mp4_file_path)
-    logging.info(f"Video saved as {mp4_file_path}.")
-
-def send_prompts_to_gemini_lyria():
-    """Music generation.
-    """
-    return
-
 @functions_framework.cloud_event
 def run_morning_stock_research(cloud_event: CloudEvent):
     """

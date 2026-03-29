@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -19,6 +20,10 @@ class GeminiContentGenerator():
         """Initialize the Gemini client with API key."""
         self.client = genai.Client(api_key=GEMINI_API_KEY)
         self.logger = logging.getLogger(__name__)
+
+        # Model names.
+        self.GEMINI_AUDIO = "lyria-3-pro-preview"
+        self.GEMINI_VIDEO = "veo-3.1-generate-preview"
     
     def image_gen(self, prompt: str, output_path: str = None) -> str:
         """
@@ -59,6 +64,7 @@ class GeminiContentGenerator():
     def audio_gen(self, prompt: str, output_path: str = None) -> str:
         """
         Generate audio content from a text prompt using Gemini.
+        This generates a mp3 file, but NOT a mp4 that can directly be uploaded to YouTube.
         
         Args:
             prompt: Text description or script for audio generation
@@ -71,20 +77,31 @@ class GeminiContentGenerator():
             self.logger.info(f"Generating audio with prompt: {prompt}")
             
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=f"Generate a script or narration for the following request: {prompt}"
+                model=self.GEMINI_AUDIO,
+                contents=f"Create a 3 minutes audio with the following description: {prompt}",
+                config=types.GenerateContentConfig(response_modalities=["AUDIO", "TEXT"],),
             )
             
-            audio_content = response.text
-            
+            # Lyria model responses needs special parsing.
+            lyrics = []
+            audio_data = None
+
+            for part in response.parts:
+                if part.text is not None:
+                    lyrics.append(part.text)
+                elif part.inline_data is not None:
+                    audio_data = part.inline_data.data
+           
+           # Only save the audio to mp4 file, ignore the lyrics.
             if output_path:
-                with open(output_path, 'w') as f:
-                    f.write(audio_content)
+                # Write binary audio data to file
+                with open(output_path+".mp4", 'wb') as f:
+                    f.write(audio_data)
                 self.logger.info(f"Audio content saved to {output_path}")
                 return output_path
             
             self.logger.info("Audio content generated successfully")
-            return audio_content
+            return audio_data
             
         except Exception as e:
             self.logger.error(f"Error generating audio: {str(e)}")
@@ -104,23 +121,41 @@ class GeminiContentGenerator():
         try:
             self.logger.info(f"Generating video with prompt: {prompt}")
             
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=f"Generate a detailed video script and storyboard for the following request: {prompt}"
+            operation = self.client.models.generate_videos(
+                model=self.GEMINI_VIDEO,
+                prompt=f"Generate a video with the following description: {prompt}"
             )
             
-            video_content = response.text
+            while not operation.done:
+                self.logger.info("Waiting for video generation to complete...")
+                time.sleep(10)  # Poll every 10 seconds
+                operation = self.client.operations.get(operation)
             
-            if output_path:
-                with open(output_path, 'w') as f:
-                    f.write(video_content)
-                self.logger.info(f"Video script saved to {output_path}")
-                return output_path
-            
-            self.logger.info("Video content generated successfully")
-            return video_content
+            # Download the generated video content.
+            generated_video = operation.response.generated_videos[0]
+            self.client.files.download(file=generated_video.video)
+            generated_video.video.save(output_path+".mp4")
+            self.logger.info(f"Generated video saved to {output_path}.mp4")
             
         except Exception as e:
             self.logger.error(f"Error generating video: {str(e)}")
             raise
 
+
+if __name__ == "__main__":
+
+    if not GEMINI_API_KEY:
+        raise EnvironmentError("GEMINI_API_KEY is not set.")
+
+    generator = GeminiContentGenerator()
+    output = "test"
+
+    prompt = ("An epic cinematic orchestral piece about a journey home. "
+              "Starts with a solo piano intro, builds through sweeping "
+              "strings, and climaxes with a massive wall of sound.")
+
+    # result = generator.image_gen(prompt, output)
+    result = generator.video_gen(prompt, output)
+    # result = generator.video_gen(prompt, output)
+
+    print(result)
