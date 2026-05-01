@@ -1,6 +1,10 @@
 from trend_watcher.trend_watcher import TrendWatcher
 from morning_stock_research.chatgpt import ask_chatgpt_with_search
-from morning_stock_research.gemini import send_prompts_to_gemini, send_email
+from morning_stock_research.gemini import (
+    send_prompts_to_gemini,
+    send_prompts_to_gemini_deep_research_agent,
+    send_email,
+)
 from sheet_reader.sheet_reader import GoogleSheetReader
 import logging
 from google import genai
@@ -22,8 +26,6 @@ from web_dashboards.prompts import url_resources
 load_dotenv()
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(filename)s:%(lineno)d - %(message)s')
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-EMAIL_SUBJECT = "Your Daily Market Research Briefing + Reddit Trends"
 
 
 def run_morning_stock_research() -> str:
@@ -98,28 +100,19 @@ def run_sheet_reader() -> str:
         "./wordpress-hosting-302807-2a5d57c336dd.json"))
     reader = GoogleSheetReader(creds_path, sheet_be_richer)
     my_holdings = reader.read_my_current_holdings()
+    holdings_text = my_holdings.to_string(index=False)
 
     # Title.
     report_html = "<h1>My Holdings Analysis</h1>"
-    # Report 1, negative impact analysis.
-    prompt = sheet_reader_prompts["my_holdings_negative_impact"] + f"\nHere is my current holdings data:\n{my_holdings.to_string(index=False)}"
-    logging.info(f"Sending prompt to Gemini: {prompt[:100]}...")
-    gemini_response = send_prompts_to_gemini(None, None, None, prompt_text=prompt)
+    # Report 1, short-term holdings analysis.
+    prompt = (
+        sheet_reader_prompts["my_holdings_analysis"]
+        + f"\nHere is my current holdings data:\n{holdings_text}"
+    )
+    logging.info(f"Sending prompt to Gemini Deep Research: {prompt[:100]}...")
+    gemini_response = send_prompts_to_gemini_deep_research_agent(prompt_text=prompt)
     formatted_response = markdown.markdown(gemini_response, extensions=["tables"])
-    report_html += f"<h2>Negative Impact Analysis</h2>"
-    report_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
-    report_html += (
-            '<div style="background:#f5f5f5;padding:15px;border-radius:8px;'
-            'font-family:monospace;white-space:pre-wrap;word-break:break-word;">'
-            f"{formatted_response}</div>"
-        )
-    report_html += "<hr>"
-    # Report 2, down trend for the past 3 days.
-    prompt = sheet_reader_prompts["my_holdings_down_trend_3days"] + f"\nHere is my current holdings data:\n{my_holdings.to_string(index=False)}"
-    logging.info(f"Sending prompt to Gemini: {prompt[:100]}...")
-    gemini_response = send_prompts_to_gemini(None, None, None, prompt_text=prompt)
-    formatted_response = markdown.markdown(gemini_response, extensions=["tables"])
-    report_html += f"<h2>Down Trend 3 Days Analysis</h2>"
+    report_html += f"<h2>Short-Term Holdings Analysis</h2>"
     report_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
     report_html += (
             '<div style="background:#f5f5f5;padding:15px;border-radius:8px;'
@@ -130,6 +123,11 @@ def run_sheet_reader() -> str:
 
     logging.info("Google Sheets reader has finished its work.")
     return report_html
+
+def test_run_sheet_reader() -> None:
+    """Run only the sheet reader workflow for local testing."""
+    report_html = run_sheet_reader()
+    print(report_html)
 
 def run_politician_trades() -> str:
     """Fetches recent stock trades made by US Congress members and analyzes them.
@@ -153,19 +151,32 @@ def run_politician_trades() -> str:
 
 @functions_framework.cloud_event
 def main(cloud_event: CloudEvent):
-    stock_report_html = run_morning_stock_research()
-    trend_watcher_report = run_trend_watcher()
-    # sheet_reader_report = run_sheet_reader()
 
-    # Don't think it's very useful.
-    # politician_trades_report = run_politician_trades()
+    try:
+        # Run stock_report, trend_watcher_report.
+        stock_report_html = run_morning_stock_research()
+        trend_watcher_report = run_trend_watcher()
 
-    # Concatenate all reports and send via email.
-    full_report_html = (stock_report_html 
-                        + trend_watcher_report 
-                        # + sheet_reader_report
-                        # + politician_trades_report
-                        )
-    send_email(EMAIL_SUBJECT, full_report_html)
+        # Don't think it's very useful.
+        # politician_trades_report = run_politician_trades()
+
+        # Concatenate all reports and send via email.
+        full_report_html = (stock_report_html 
+                            + trend_watcher_report 
+                            # + politician_trades_report
+                            )
+        send_email("My Daily Market Research Briefing + Reddit Trends", full_report_html)
+    except Exception as e:
+        logging.error(f"An error occurred while running the morning stock & trend watcher: {e}")
+
+    try:
+        # Run sheet_reader_report and do a deep research for each holding, then send email.
+        holdings_analysis_report = run_sheet_reader()
+        send_email("My Holdings Analysis", holdings_analysis_report)
+    except Exception as e:
+        logging.error(f"An error occurred while running the sheet reader: {e}")
 
     logging.info("Main function execution completed.")
+
+if __name__ == "__main__":
+    test_run_sheet_reader()

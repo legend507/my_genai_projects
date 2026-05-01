@@ -1,6 +1,15 @@
 # sheet_reader/prompts.py
 # Predefined prompts for the sheet reader module.
 sheet_reader_prompts = {
-    "my_holdings_negative_impact": "Analyze my current stock holdings and tell me if any of the stocks are impacted by any notable news in the past 2 days. Give me links to the news articles and when the news was published.",
-    "my_holdings_down_trend_3days": "Analyze my current stock holdings and identify any stocks that had 3% decline or more for the past 3 trading days. Provide possible reasons for the decline with relevant news links.",
+    "my_holdings_analysis": (
+        "Analyze my current stock holdings from the perspective of a short-period trader "
+        "with a holding horizon of a few weeks. For each relevant holding, evaluate both "
+        "positive and negative news, near-term trends, momentum, and catalysts that could "
+        "affect the stock over the next several weeks. Explain the bullish and bearish case "
+        "for each position, assess whether the current setup supports continuing to hold or "
+        "exiting the position, and give a clear suggestion for each holding: hold, reduce, "
+        "or exit. Prioritize practical short-term trading judgment over long-term investing "
+        "theory. Include links to all references you use, and include publication dates for "
+        "news or research sources."
+    ),
 }

@@ -73,10 +73,10 @@ class GoogleSheetReader:
         """From my portfolio, filter current holdings.
         """
         my_portfolio = self.read_my_portfolio()
-        # Filter condition: US stock, no out date.
+        # Filter condition: US stock, no out date, no duplicate tickers.
         return my_portfolio[
             (my_portfolio["Broker"] == "IBKR") & (my_portfolio["Out date"] == "")
-        ]["Ticker"]
+        ]["Ticker"].drop_duplicates().reset_index(drop=True)
     
     def read_my_watchlist(self, worksheet_name: str = "Stock Eval"):
         """Read my watchlist to decide when to open positions.
@@ -88,7 +88,6 @@ if __name__ == "__main__":
     # Sheets info.
     sheet_be_richer = 'be_richer'
     tab_trade_records = 'Trade Records'
-    tab_stock_eval = 'Stock Eval'
 
     creds_path = os.path.abspath(os.path.join(
         os.path.dirname(__file__), 
