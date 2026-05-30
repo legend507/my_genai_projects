@@ -177,6 +177,3 @@ def main(cloud_event: CloudEvent):
         logging.error(f"An error occurred while running the sheet reader: {e}")
 
     logging.info("Main function execution completed.")
-
-if __name__ == "__main__":
-    test_run_sheet_reader()

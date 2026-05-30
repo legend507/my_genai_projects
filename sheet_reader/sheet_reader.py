@@ -9,7 +9,8 @@ class GoogleSheetReader:
         self.creds_json_path = creds_json_path
         self.sheet_name = sheet_name
         self.client = self._authorize()
-        self.sheet = self.client.open(sheet_name)
+        # self.sheet = self.client.open(sheet_name)
+        self.sheet = self.client.open_by_key('1-0oWrYrm4HcSl8ReYzth6vIqfqRhQFM0ORaBWgiWPkg') # Points to the "be_richer" sheet.
 
     def _authorize(self):
         scopes = [
