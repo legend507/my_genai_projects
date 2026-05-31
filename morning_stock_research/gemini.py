@@ -1,22 +1,9 @@
 import logging
 import os
 import time
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
-import markdown
-
-# Try relative import first (when used as a package), fall back to direct import for testing
-try:
-    from .prompts import research_prompts  # Import the research prompts from prompts.py
-except ImportError:
-    from prompts import research_prompts  # For direct script execution
-# For GCP Cloud Run Functions.
-from cloudevents.http import CloudEvent
-import functions_framework
 
 
 # Configure the logger
@@ -28,9 +15,6 @@ load_dotenv()
 # --- Configuration ---
 # From my corp account, intercom-connector-prod project.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-SENDER_EMAIL = os.getenv("SENDER_EMAIL")
-SENDER_APP_PASSWORD = os.getenv("SENDER_APP_PASSWORD")
-RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
 
 
 def send_prompts_to_gemini(client, model_to_use, config, prompt_text, url_grounding = False) -> str:
@@ -179,55 +163,6 @@ def send_prompts_to_gemini_deep_research_agent(
     except Exception as e:
         logging.error(f"An error occurred while calling the Gemini Deep Research agent: {e}")
         return f"Error generating deep research response for prompt: {prompt_text}"
-
-def send_email(subject, body):
-    """
-    Sends an email using Gmail's SMTP server.
-
-    Args:
-        subject (str): The subject of the email.
-        body (str): The HTML body of the email.
-    """
-    if not all([SENDER_EMAIL, SENDER_APP_PASSWORD, RECIPIENT_EMAIL]):
-        logging.info("Email credentials are not fully configured in the .env file. Skipping email.")
-        return
-
-    logging.info(f"Preparing to send email to {RECIPIENT_EMAIL}...")
-    
-    msg = MIMEMultipart()
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = RECIPIENT_EMAIL
-    msg['Subject'] = subject
-
-    # Style the email body for better readability
-    html_body = f"""
-    <html>
-    <head>
-        <style>
-            body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-            h1 {{ color: #1a73e8; }}
-            h2 {{ color: #4CAF50; border-bottom: 2px solid #f0f0f0; padding-bottom: 5px;}}
-            p {{ margin-bottom: 15px; }}
-            pre {{ background-color: #f5f5f5; padding: 15px; border-radius: 8px; white-space: pre-wrap; word-wrap: break-word; }}
-        </style>
-    </head>
-    <body>
-        {body}
-    </body>
-    </html>
-    """
-    msg.attach(MIMEText(html_body, 'html'))
-
-    try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
-        server.sendmail(SENDER_EMAIL, RECIPIENT_EMAIL, msg.as_string())
-        server.quit()
-        logging.info("Email sent successfully!")
-    except Exception as e:
-        logging.error(f"Failed to send email: {e}")
-
 
 if __name__ == "__main__":
     client = genai.Client(api_key=GEMINI_API_KEY)

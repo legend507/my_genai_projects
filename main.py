@@ -1,16 +1,15 @@
 from trend_watcher.trend_watcher import TrendWatcher
-from morning_stock_research.chatgpt import ask_chatgpt_with_search
 from morning_stock_research.gemini import (
     send_prompts_to_gemini,
     send_prompts_to_gemini_deep_research_agent,
-    send_email,
 )
+from morning_stock_research.chatgpt import AskChatGPT
+from morning_stock_research.email_sender import send_email
 from sheet_reader.sheet_reader import GoogleSheetReader
 import logging
-from google import genai
-from google.genai import types
 import markdown
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 
 # For GCP Cloud Run Functions.
@@ -26,6 +25,41 @@ from web_dashboards.prompts import url_resources
 load_dotenv()
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(filename)s:%(lineno)d - %(message)s')
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+LLM_PROVIDER = "chatgpt"
+_ask_chatgpt = None
+
+
+def get_ask_chatgpt() -> AskChatGPT:
+    global _ask_chatgpt
+    if _ask_chatgpt is None:
+        _ask_chatgpt = AskChatGPT()
+    return _ask_chatgpt
+
+
+def send_single_turn_prompt(prompt_text: str, url_grounding: bool = False) -> str:
+    if LLM_PROVIDER.lower() == "chatgpt":
+        logging.info(f"Sending single-turn prompt to ChatGPT: {prompt_text[:100]}...")
+        ask_chatgpt = get_ask_chatgpt()
+        return ask_chatgpt.single_turn_query(prompt_text=prompt_text)
+
+    logging.info(f"Sending single-turn prompt to Gemini: {prompt_text[:100]}...")
+    return send_prompts_to_gemini(
+        None,
+        None,
+        None,
+        prompt_text=prompt_text,
+        url_grounding=url_grounding,
+    )
+
+
+def send_deep_research_prompt(prompt_text: str) -> str:
+    if LLM_PROVIDER.lower() == "chatgpt":
+        logging.info(f"Sending deep research prompt to ChatGPT: {prompt_text[:100]}...")
+        ask_chatgpt = get_ask_chatgpt()
+        return ask_chatgpt.deep_research_query(prompt_text=prompt_text)
+
+    logging.info(f"Sending deep research prompt to Gemini: {prompt_text[:100]}...")
+    return send_prompts_to_gemini_deep_research_agent(prompt_text=prompt_text)
 
 
 def run_morning_stock_research() -> str:
@@ -33,14 +67,13 @@ def run_morning_stock_research() -> str:
     """
     logging.info(f"Starting the morning stock market research agent...")
     
-    # 1. Gather research from Gemini for each prompt
+    # 1. Gather research from the configured LLM for each prompt
     report_html = "<h1>Morning Stock Market Research</h1>"
     for item in research_prompts:
         topic = item["topic"]
         prompt = item["prompt"]
         
-        # Get the analysis from Gemini
-        response_text = send_prompts_to_gemini(None, None, None, prompt)
+        response_text = send_single_turn_prompt(prompt_text=prompt)
 
         # Convert Markdown to HTML for better formatting
         formatted_response = markdown.markdown(response_text, extensions=["tables"])
@@ -73,10 +106,10 @@ def run_trend_watcher() -> str:
         [f"{i+1}. {post['title']} (Scores: {post['score']}) (URL: {post['url']}) \n\n" for i, post in enumerate(top_reddit_posts)]
     )
     prompt = (trend_watcher_prompts["reddit"] + f"{formatted_posts}")
-    logging.info(f"Sdnding prompt to Gemini: {prompt[:100]}...")
+    logging.info(f"Sending trend watcher prompt to {LLM_PROVIDER}: {prompt[:100]}...")
 
-    gemini_response = send_prompts_to_gemini(None, None, None, prompt_text=prompt)
-    formatted_response = markdown.markdown(gemini_response, extensions=["tables"])
+    llm_response = send_single_turn_prompt(prompt_text=prompt)
+    formatted_response = markdown.markdown(llm_response, extensions=["tables"])
     report_html = "<h1>TrendWatcher Analysis</h1>"
     report_html += f"<h2>Reddit Top 50 Trending Posts</h2>"
     report_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
@@ -109,9 +142,9 @@ def run_sheet_reader() -> str:
         sheet_reader_prompts["my_holdings_analysis"]
         + f"\nHere is my current holdings data:\n{holdings_text}"
     )
-    logging.info(f"Sending prompt to Gemini Deep Research: {prompt[:100]}...")
-    gemini_response = send_prompts_to_gemini_deep_research_agent(prompt_text=prompt)
-    formatted_response = markdown.markdown(gemini_response, extensions=["tables"])
+    logging.info(f"Sending holdings prompt to {LLM_PROVIDER} deep research: {prompt[:100]}...")
+    llm_response = send_deep_research_prompt(prompt_text=prompt)
+    formatted_response = markdown.markdown(llm_response, extensions=["tables"])
     report_html += f"<h2>Short-Term Holdings Analysis</h2>"
     report_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
     report_html += (
@@ -135,9 +168,9 @@ def run_politician_trades() -> str:
     logging.info("Starting Politician Trades Analysis...")
     # Example URL for politician trades.
     prompt = url_resources["prompts"] + ", ".join(url_resources["well_known_politicians"])
-    logging.info(f"Sending prompt to Gemini: {prompt[:100]}...")
-    gemini_response = send_prompts_to_gemini(None, None, None, prompt_text=prompt, url_grounding=True)
-    formatted_response = markdown.markdown(gemini_response, extensions=["tables"])
+    logging.info(f"Sending politician trades prompt to {LLM_PROVIDER}: {prompt[:100]}...")
+    llm_response = send_single_turn_prompt(prompt_text=prompt, url_grounding=True)
+    formatted_response = markdown.markdown(llm_response, extensions=["tables"])
     report_html = "<h1>Politician Trades Analysis</h1>"
     report_html += f"<p><strong>Prompt:</strong> {prompt}</p>"
     report_html += (
@@ -169,11 +202,14 @@ def main(cloud_event: CloudEvent):
     except Exception as e:
         logging.error(f"An error occurred while running the morning stock & trend watcher: {e}")
 
-    try:
-        # Run sheet_reader_report and do a deep research for each holding, then send email.
-        holdings_analysis_report = run_sheet_reader()
-        send_email("My Holdings Analysis", holdings_analysis_report)
-    except Exception as e:
-        logging.error(f"An error occurred while running the sheet reader: {e}")
+    if datetime.now().weekday() == 4:
+        try:
+            # Run sheet_reader_report and do a deep research for each holding, then send email.
+            holdings_analysis_report = run_sheet_reader()
+            send_email("My Holdings Analysis", holdings_analysis_report)
+        except Exception as e:
+            logging.error(f"An error occurred while running the sheet reader: {e}")
+    else:
+        logging.info("Skipping sheet reader because today is not Friday.")
 
     logging.info("Main function execution completed.")
